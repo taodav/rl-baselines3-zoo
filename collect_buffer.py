@@ -238,7 +238,7 @@ def collect_buffer() -> None:  # noqa: C901
     if args.progress:
         if tqdm is None:
             raise ImportError("Please install tqdm and rich to use the progress bar")
-        progress_bar = tqdm(total=args.buffer_size)
+        progress_bar = tqdm(total=args.buffer_size, desc="Collecting buffer")
 
     try:
         while n_collected < args.buffer_size:
@@ -308,6 +308,24 @@ def collect_buffer() -> None:  # noqa: C901
             return np.stack(values, axis=0)
         return np.asarray(values)
 
+
+    # add run statistics
+    all_values, all_log_probs, all_entropies = [], [], []
+    chunks = int(np.floor(args.buffer_size / 32))
+    chunked_observations, chunked_actions = np.array_split(np.stack(observations), chunks, axis=0), np.array_split(np.stack(actions), chunks, axis=0)
+    prog_bar = tqdm(total=chunks, desc="Evaluating actions")
+    for obs, actions in zip(chunked_observations, chunked_actions):
+        obs_for_policy, _ = model.policy.obs_to_tensor(obs)
+        value, log_prob, entropy = model.policy.evaluate_actions(obs_for_policy.to(model.device), th.tensor(actions).to(model.device))
+        all_values.append(value.cpu().detach().numpy())
+        all_log_probs.append(log_prob.cpu().detach().numpy())
+        # all_entropies.append(entropy.cpu().detach().numpy())
+        prog_bar.update(1)
+    prog_bar.close()
+    all_values = np.concatenate(all_values, axis=0)
+    all_log_probs = np.concatenate(all_log_probs, axis=0)
+    # all_entropies = np.concatenate(all_entropies, axis=0)
+
     buffer_data = {
         "observations": _stack_or_array(observations),
         "next_observations": _stack_or_array(next_observations),
@@ -315,6 +333,9 @@ def collect_buffer() -> None:  # noqa: C901
         "rewards": np.asarray(rewards, dtype=np.float32),
         "dones": np.asarray(dones, dtype=bool),
         "episode_starts": np.asarray(episode_starts, dtype=bool),
+        "values": all_values,
+        "log_probs": all_log_probs,
+        # "entropies": all_entropies,
     }
     np.savez_compressed(buffer_path, **buffer_data)
 

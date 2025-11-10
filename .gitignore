@@ -12,7 +12,6 @@ rl-trained_agents/
 .pytype/
 htmlcov/
 git_rewrite_commit_history.sh
-.vscode/
 wandb
 runs
 hub
