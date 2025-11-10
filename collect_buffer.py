@@ -296,7 +296,9 @@ def collect_buffer() -> None:  # noqa: C901
         if progress_bar is not None:
             progress_bar.close()
 
-    buffer_path, metadata_path = _prepare_output_paths(args.buffer_path, args.metadata_path)
+    buffer_dir = f"buffers/{args.env}-{args.algo}-{args.buffer_size}"
+    bpath, mpath = f"{buffer_dir}/{args.buffer_path}", f"{buffer_dir}/{args.metadata_path}"
+    buffer_path, metadata_path = _prepare_output_paths(bpath, mpath)
 
     def _stack_or_array(values: List[Any]) -> np.ndarray:
         if len(values) == 0:
