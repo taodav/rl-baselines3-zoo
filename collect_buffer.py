@@ -308,6 +308,13 @@ def collect_buffer() -> None:  # noqa: C901
             return np.stack(values, axis=0)
         return np.asarray(values)
 
+    # calculate returns
+    current_return = 0
+    all_returns = []
+    for reward, done in zip(reversed(rewards), reversed(dones)):
+        current_return = reward + model.gamma * (1 - done) * current_return
+        all_returns.append(current_return)
+    all_returns = all_returns[::-1]
 
     # add run statistics
     all_values, all_log_probs, all_entropies = [], [], []
@@ -333,8 +340,9 @@ def collect_buffer() -> None:  # noqa: C901
         "rewards": np.asarray(rewards, dtype=np.float32),
         "dones": np.asarray(dones, dtype=bool),
         "episode_starts": np.asarray(episode_starts, dtype=bool),
-        "values": all_values,
+        "estimated_values": all_values,
         "log_probs": all_log_probs,
+        "returns": all_returns,
         # "entropies": all_entropies,
     }
     np.savez_compressed(buffer_path, **buffer_data)
