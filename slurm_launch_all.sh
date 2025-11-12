@@ -4,7 +4,7 @@ RAN_JOBS=''
 for item in $BUFFERS_DIR/*/;
 do
   printf "\n"
-  FILE_NAME=$item/buffer.npz
+  FILE_NAME=$item"buffer.npz"
   JOB_NAME=$(basename $item)
   echo "---------LAUNCHING $FILE_NAME---------"
   echo "---------JOB NAME: $JOB_NAME---------"
