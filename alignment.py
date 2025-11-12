@@ -1,3 +1,4 @@
+import argparse
 from typing import Optional, Union
 from pathlib import Path
 
@@ -145,7 +146,11 @@ def alignment_sweep_dask(
 
 
 if __name__ == "__main__":
-    dataset_fname = "/home/taodav/Documents/rl-baselines3-zoo/buffers/BreakoutNoFrameskip-v4-ppo-100000_compressed/buffer.npz"
+    parser = argparse.ArgumentParser(description="Compute alignment of returns and states.")
+    parser.add_argument("--dataset-fname", type=str)
+    args = parser.parse_args()
+
+    dataset_fname = args.dataset_fname
     dataset_path = Path(dataset_fname)
 
     env_name = '-'.join(dataset_fname.split('/')[-2].split('-')[:2])

@@ -4,7 +4,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch as th
@@ -12,12 +12,44 @@ import yaml
 from huggingface_sb3 import EnvironmentName
 from stable_baselines3.common.callbacks import tqdm
 from stable_baselines3.common.utils import set_random_seed
+from tqdm import trange
 
 import rl_zoo3.import_envs  # noqa: F401 pylint: disable=unused-import
 from rl_zoo3 import ALGOS, create_test_env, get_saved_hyperparams
 from rl_zoo3.exp_manager import ExperimentManager
 from rl_zoo3.load_from_hub import download_from_hub
 from rl_zoo3.utils import StoreDict, get_model_path
+
+
+def downsample_mean(
+    X: Union[np.ndarray, np.memmap],
+    chunk_size: int = 512,
+    out: Optional[Union[np.ndarray, np.memmap]] = None,
+    dtype=np.float32,
+):
+    """
+    X: (B,84,84,4) array-like (np.ndarray or np.memmap). Columns are channels last.
+    chunk_size: number of items per chunk along batch dimension.
+    out: optional preallocated/memmap array of shape (B,42,42,4). If None, allocates.
+    dtype: dtype for computation/output.
+
+    Returns: out (np.ndarray or np.memmap) with shape (B,42,42,4)
+    """
+    assert X.ndim == 4 and X.shape[1:4] == (84, 84, 4), "Expected (B,84,84,4)"
+    B = X.shape[0]
+
+    if out is None:
+        out = np.empty((B, 42, 42, 4), dtype=dtype)
+
+    print("Downsampling Images")
+    for start in trange(0, B, chunk_size):
+        stop = min(start + chunk_size, B)
+        xb = np.asarray(X[start:stop], dtype=dtype)  # (b,84,84,4)
+        # 2x2 area/mean pooling without copies
+        xb = xb.reshape(stop-start, 42, 2, 42, 2, 4).mean(axis=(2, 4))
+        out[start:stop] = xb  # (b,42,42,4)
+
+    return out
 
 
 def _array_copy(value: Any) -> np.ndarray:
@@ -58,7 +90,7 @@ def collect_buffer() -> None:  # noqa: C901
     parser.add_argument(
         "--metadata-path",
         help="Optional metadata path (defaults to buffer_path with .json extension)",
-        default=None,
+        default="metadata.json",
         type=str,
     )
     parser.add_argument("--num-threads", help="Number of threads for PyTorch (-1 to use default)", default=-1, type=int)
@@ -81,6 +113,12 @@ def collect_buffer() -> None:  # noqa: C901
         action="store_true",
         default=False,
         help="Load last checkpoint instead of last model if available",
+    )
+    parser.add_argument(
+        "--compress-obs",
+        action="store_true",
+        default=False,
+        help="Do we compress our observations?",
     )
     parser.add_argument(
         "--norm-reward", action="store_true", default=False, help="Normalize reward if applicable (trained with VecNormalize)"
@@ -297,6 +335,10 @@ def collect_buffer() -> None:  # noqa: C901
             progress_bar.close()
 
     buffer_dir = f"buffers/{args.env}-{args.algo}-{args.buffer_size}"
+
+    if args.compress_obs:
+        buffer_dir += "_compressed"
+
     bpath, mpath = f"{buffer_dir}/{args.buffer_path}", f"{buffer_dir}/{args.metadata_path}"
     buffer_path, metadata_path = _prepare_output_paths(bpath, mpath)
 
@@ -333,9 +375,15 @@ def collect_buffer() -> None:  # noqa: C901
     all_log_probs = np.concatenate(all_log_probs, axis=0)
     # all_entropies = np.concatenate(all_entropies, axis=0)
 
+    stacked_obs = _stack_or_array(observations) 
+    stacked_next_obs = _stack_or_array(next_observations)
+    if args.compress_obs:
+        stacked_obs = downsample_mean(stacked_obs, chunk_size=256)
+        stacked_next_obs = downsample_mean(stacked_next_obs, chunk_size=256)
+
     buffer_data = {
-        "observations": _stack_or_array(observations),
-        "next_observations": _stack_or_array(next_observations),
+        "observations": stacked_obs,
+        "next_observations": stacked_next_obs,
         "actions": _stack_or_array(actions),
         "rewards": np.asarray(rewards, dtype=np.float32),
         "dones": np.asarray(dones, dtype=bool),
