@@ -8,5 +8,5 @@ do
   JOB_NAME=$(basename $item)
   echo "---------LAUNCHING $FILE_NAME---------"
   echo "---------JOB NAME: $JOB_NAME---------"
-#   sbatch slurm_launch.sh $FILE_NAME -j $JOB_NAME
+  sbatch slurm_launch.sh $FILE_NAME -j $JOB_NAME
 done
