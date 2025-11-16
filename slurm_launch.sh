@@ -1,3 +1,4 @@
+#!/bin/bash
 #SBATCH -n 24
 #SBATCH --mem=256G
 #SBATCH -t 3:00:00
