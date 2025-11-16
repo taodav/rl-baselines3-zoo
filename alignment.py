@@ -148,6 +148,9 @@ def alignment_sweep_dask(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compute alignment of returns and states.")
     parser.add_argument("--dataset-fname", type=str)
+    parser.add_argument("--x_include_actions", action="store_true", default=False)
+    parser.add_argument("--target", type=str, default="returns", choices=["returns", "next_obs", "policy_gradient"])
+    
     args = parser.parse_args()
 
     dataset_fname = args.dataset_fname
@@ -167,8 +170,21 @@ if __name__ == "__main__":
     # buffer['observations'] = mean_pooled_states
     # np.savez_compressed(new_dataset_path, **buffer)
 
-    flat_states = states.reshape(states.shape[0], -1).T
-    returns = buffer['returns'][:, None].T
+    flat_states = states.reshape(states.shape[0], -1).T  # D x N
+
+    if args.x_include_actions:
+        actions = buffer['actions'].T  # A x N
+        flat_states = np.concatenate([flat_states, actions], axis=1)
+
+    
+    if args.target == "returns":
+        targets = buffer['returns'][:, None].T  # 1 x N
+    elif args.target == "next_obs":
+        targets = buffer['next_observations'].reshape(buffer['next_observations'].shape[0], -1).T  # D x N
+    elif args.target == "policy_gradient":
+        returns = buffer['returns'][None, :]
+        log_probs = buffer['log_probs'][None, :]
+        pg_targets = returns * log_probs
 
     k = flat_states.shape[0]
     return_alignments = alignment_sweep_dask(flat_states, returns, 
