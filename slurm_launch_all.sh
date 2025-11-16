@@ -1,3 +1,4 @@
+#!/bin/bash
 BUFFERS_DIR='/users/rtao7/projects/rl-baselines3-zoo/buffers'
 RAN_JOBS=''
 
