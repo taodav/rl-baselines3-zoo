@@ -173,8 +173,12 @@ if __name__ == "__main__":
     flat_states = states.reshape(states.shape[0], -1).T  # D x N
 
     if args.x_include_actions:
-        actions = buffer['actions'].T  # A x N
-        flat_states = np.concatenate([flat_states, actions], axis=1)
+        actions = buffer['actions']  # N x A
+        if actions.ndim == 1:
+            actions = actions[None, :]
+        else:
+            actions = actions.T
+        flat_states = np.concatenate([flat_states, actions], axis=0)  # (D + A) x N
 
     
     if args.target == "returns":
@@ -184,19 +188,20 @@ if __name__ == "__main__":
     elif args.target == "policy_gradient":
         returns = buffer['returns'][None, :]
         log_probs = buffer['log_probs'][None, :]
-        pg_targets = returns * log_probs
+        targets = returns * log_probs
 
     k = flat_states.shape[0]
-    return_alignments = alignment_sweep_dask(flat_states, returns, 
+    return_alignments = alignment_sweep_dask(flat_states, targets, 
                                              k=k,
                                              randomized=True,
                                              chunks=(flat_states.shape[0], 500))
 
     results = {
-        'return_alignments': return_alignments,
+        'alignment_type': args.target,
+        'alignments': return_alignments,
         'k': k
     }
-    alignments_fpath = dataset_path.parent / "alignments.npy"
+    alignments_fpath = dataset_path.parent / f"{args.target}_alignments.npy"
 
     np.save(alignments_fpath, results)
     print(f"Saved alignment results to {alignments_fpath}")

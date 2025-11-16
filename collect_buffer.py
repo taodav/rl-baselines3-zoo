@@ -363,9 +363,9 @@ def collect_buffer() -> None:  # noqa: C901
     chunks = int(np.floor(args.buffer_size / 32))
     chunked_observations, chunked_actions = np.array_split(np.stack(observations), chunks, axis=0), np.array_split(np.stack(actions), chunks, axis=0)
     prog_bar = tqdm(total=chunks, desc="Evaluating actions")
-    for obs, actions in zip(chunked_observations, chunked_actions):
+    for obs, a in zip(chunked_observations, chunked_actions):
         obs_for_policy, _ = model.policy.obs_to_tensor(obs)
-        value, log_prob, entropy = model.policy.evaluate_actions(obs_for_policy.to(model.device), th.tensor(actions).to(model.device))
+        value, log_prob, entropy = model.policy.evaluate_actions(obs_for_policy.to(model.device), th.tensor(a).to(model.device))
         all_values.append(value.cpu().detach().numpy())
         all_log_probs.append(log_prob.cpu().detach().numpy())
         # all_entropies.append(entropy.cpu().detach().numpy())

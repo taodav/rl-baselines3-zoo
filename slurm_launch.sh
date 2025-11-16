@@ -7,4 +7,5 @@
 
 source venv/bin/activate
 
-python alignment.py --dataset-fname $1
+python alignment.py --dataset-fname $1 --target returns
+# python alignment.py --dataset-fname $1 --x_include_actions --target next_obs
